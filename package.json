@@ -2,8 +2,9 @@
     "name": "cloudinary-connector",
     "version": "1.0.0",
     "description": "",
-    "main": "src/CloudinaryConnector.js",
+    "main": "lib/CloudinaryConnector.js",
     "scripts": {
+        "build": "rm -rf lib/* && babel src --out-dir lib",
         "test": "echo \"Error: no test specified\" && exit 1",
         "demo": "babel-node ./demo.js"
     },
