@@ -109,9 +109,14 @@ export default class CloudinaryConnector {
 		try {
 			breakpoints = await this.getBreakpoints(imageUrl, transformation, options.breakpointConfig);
 		} catch (error) {
-			// Catch the error and continue without breakpoints
+			// Catch the error and continue without calculated breakpoints
 			console.error(error.message);
-			breakpoints = ['auto'];
+
+			const {
+				minWidth, maxWidth
+			} = {...this._breakpointConfig, ...options.breakpointConfig};
+
+			breakpoints = [minWidth, minWidth/2 + maxWidth/2, maxWidth];
 		}
 
 		return breakpoints.map(breakpoint => {
@@ -135,7 +140,7 @@ export default class CloudinaryConnector {
 	async getBreakpoints(imageUrl, transformation, breakpointConfig = null) {
 		const {
 			minWidth, maxWidth, minBreakpointSizeDiffKB, maxBreakpoints, list: breakpointList
-		} = (breakpointConfig ? { ...this._breakpointConfig, ...breakpointConfig } : this._breakpointConfig);
+		} = {...this._breakpointConfig, ...options.breakpointConfig};
 
 		// If a "list" is given in the breakpoint config, use that list instead of calculate one.
 		if (breakpointList && breakpointList.length) {
