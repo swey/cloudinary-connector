@@ -140,7 +140,7 @@ export default class CloudinaryConnector {
 	async getBreakpoints(imageUrl, transformation, breakpointConfig = null) {
 		const {
 			minWidth, maxWidth, minBreakpointSizeDiffKB, maxBreakpoints, list: breakpointList
-		} = {...this._breakpointConfig, ...options.breakpointConfig};
+		} = {...this._breakpointConfig, ...breakpointConfig};
 
 		// If a "list" is given in the breakpoint config, use that list instead of calculate one.
 		if (breakpointList && breakpointList.length) {
