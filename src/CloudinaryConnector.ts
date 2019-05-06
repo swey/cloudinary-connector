@@ -1,27 +1,53 @@
 import cloudinary from 'cloudinary';
 import axios from 'axios';
 
+export interface BaseConfig {
+	type?: 'fetch' | 'upload',
+	secure?: boolean
+};
+
+export interface BreakpointConfig {
+	minWidth: number,
+	maxWidth: number,
+	minBreakpointSizeDiffKB: number,
+	maxBreakpoints: number,
+	list?: any[]
+};
+
+export interface Breakpoint {
+	src: string
+	width: number,
+	height?: number
+}
+
+
 export default class CloudinaryConnector {
-	static BASE_CONFIG_DEFAULTS = {
+	private static BASE_CONFIG_DEFAULTS: BaseConfig = {
 		type: 'fetch',
 		secure: true
 	};
 
-	static BREAKPOINT_CONFIG_DEFAULTS = {
+	private static BREAKPOINT_CONFIG_DEFAULTS: BreakpointConfig = {
 		minWidth: 320,
 		maxWidth: 4000,
 		minBreakpointSizeDiffKB: 25,
 		maxBreakpoints: 6
 	};
 
-	static TRANSFORMATION_DEFAULTS = {
+	private static TRANSFORMATION_DEFAULTS: Record<string, any> = {
 		crop: 'fill',
 		fetch_format: 'auto'
 	};
 
 	static MAX_PIXEL = 25 * 1000 * 1000;
 
-	constructor(cloudName, baseConfig = {}) {
+	private _baseConfig: BaseConfig;
+
+	private _breakpointConfig: BreakpointConfig;
+
+	private _transformationDefaults: Record<string, any>;
+
+	constructor(cloudName: string, baseConfig: BaseConfig = {}) {
 		cloudinary.config({
 			cloud_name: cloudName
 		});
@@ -31,7 +57,7 @@ export default class CloudinaryConnector {
 		Object.freeze(CloudinaryConnector.BREAKPOINT_CONFIG_DEFAULTS);
 		Object.freeze(CloudinaryConnector.TRANSFORMATION_DEFAULTS);
 
-		this._baseConfig = { ...CloudinaryConnector.BASE_CONFIG_DEFAULTS, baseConfig };
+		this._baseConfig = { ...CloudinaryConnector.BASE_CONFIG_DEFAULTS, ...baseConfig };
 		this._breakpointConfig = { ...CloudinaryConnector.BREAKPOINT_CONFIG_DEFAULTS };
 		this._transformationDefaults = { ...CloudinaryConnector.TRANSFORMATION_DEFAULTS };
 	}
@@ -40,7 +66,7 @@ export default class CloudinaryConnector {
 	 *
 	 * @param {Object} config
 	 */
-	updateBaseConfig(config) {
+	public updateBaseConfig(config: BaseConfig): void {
 		this._baseConfig = { ...this._baseConfig, ...config };
 	}
 
@@ -48,7 +74,7 @@ export default class CloudinaryConnector {
 	 *
 	 * @returns {{type: string, secure: boolean, baseConfig}|*}
 	 */
-	getBaseConfig() {
+	public getBaseConfig(): BaseConfig {
 		return this._baseConfig;
 	}
 
@@ -56,7 +82,7 @@ export default class CloudinaryConnector {
 	 *
 	 * @param {Object} config
 	 */
-	updateBreakpointConfig(config) {
+	public updateBreakpointConfig(config: BreakpointConfig): void {
 		this._breakpointConfig = { ...this._breakpointConfig, ...config };
 	}
 
@@ -64,7 +90,7 @@ export default class CloudinaryConnector {
 	 *
 	 * @returns {{minBreakpointSizeDiffKB: number, maxBreakpoints: number, minWidth: number, maxWidth: number}|*}
 	 */
-	getBreakpointConfig() {
+	public getBreakpointConfig(): BreakpointConfig {
 		return this._breakpointConfig;
 	}
 
@@ -72,7 +98,7 @@ export default class CloudinaryConnector {
 	 *
 	 * @param {Object} defaults
 	 */
-	updateTransformationDefaults(defaults) {
+	public updateTransformationDefaults(defaults: Record<string, any>): void {
 		this._transformationDefaults = { ...this._transformationDefaults, ...defaults };
 	}
 
@@ -82,7 +108,7 @@ export default class CloudinaryConnector {
 	 * @param {Object|Array} options
 	 * @returns {Promise<{src: *, width: *, height: *}[]>}
 	 */
-	async getSrcSet(imageUrl, options = {}) {
+	public async getSrcSet(imageUrl: string, options: Record<string, any> = {}): Promise<Breakpoint[]> {
 		let transformation = options.transformation || options;
 
 		if (!Array.isArray(transformation)) {
@@ -93,7 +119,7 @@ export default class CloudinaryConnector {
 		transformation[0] = { ...this._transformationDefaults, ...transformation[0] };
 
 		// Aspect Ratio Handling
-		transformation.map(transformationItem => {
+		transformation.map((transformationItem: Record<string, any>): Record<string, any> => {
 			/* eslint-disable no-param-reassign */
 			if (transformationItem.aspectRatio) {
 				transformationItem.aspect_ratio = transformationItem.aspectRatio.replace(/x/, ':');
@@ -104,31 +130,27 @@ export default class CloudinaryConnector {
 			return transformationItem;
 		});
 
-		let breakpoints;
+		let breakpoints: number[];
 
 		try {
 			breakpoints = await this.getBreakpoints(imageUrl, transformation, options.breakpointConfig);
 		} catch (error) {
 			// Catch the error and continue without calculated breakpoints
 			console.error(error.message);
-
-			const {
-				minWidth, maxWidth
-			} = {...this._breakpointConfig, ...options.breakpointConfig};
-
-			breakpoints = [minWidth, minWidth/2 + maxWidth/2, maxWidth];
+			const breakpointConfig: BreakpointConfig = { ...this._breakpointConfig, ...options.breakpointConfig };
+			breakpoints = [breakpointConfig.minWidth, breakpointConfig.minWidth / 2 + breakpointConfig.maxWidth / 2, breakpointConfig.maxWidth];
 		}
 
-		return breakpoints.map(breakpoint => {
+		return breakpoints.map((breakpoint: number): Breakpoint => {
 			transformation[0].width = breakpoint;
 
 			return {
 				src: cloudinary.url(imageUrl, { ...this._baseConfig, transformation }),
 				width: breakpoint,
-				height: null
 			};
 		});
 	}
+
 
 	/**
 	 *
@@ -137,31 +159,29 @@ export default class CloudinaryConnector {
 	 * @param {Object} [breakpointConfig]
 	 * @returns {Promise<Array>}
 	 */
-	async getBreakpoints(imageUrl, transformation, breakpointConfig = null) {
-		const {
-			minWidth, maxWidth, minBreakpointSizeDiffKB, maxBreakpoints, list: breakpointList
-		} = {...this._breakpointConfig, ...breakpointConfig};
+	private async getBreakpoints(imageUrl: string, transformation: any[], breakpointConfig?: BreakpointConfig): Promise<number[]> {
+		const _breakpointConfig: BreakpointConfig = { ...this._breakpointConfig, ...breakpointConfig };
 
-		// If a "list" is given in the breakpoint config, use that list instead of calculate one.
-		if (breakpointList && breakpointList.length) {
-			return breakpointList;
+		// If a "list" is given in the breakpoint config, use that list instead of calculating one.
+		if (_breakpointConfig.list && _breakpointConfig.list.length) {
+			return _breakpointConfig.list;
 		}
 
 		// Don't calculate breakpoints if max width is below the smallest wanted breakpoint
-		if (maxWidth <= minWidth) {
-			return [maxWidth];
+		if (_breakpointConfig.maxWidth <= _breakpointConfig.minWidth) {
+			return [_breakpointConfig.maxWidth];
 		}
 
-		const breakpointTransformation = [...transformation, {
-			width: `auto:breakpoints_${minWidth}_${maxWidth}_${minBreakpointSizeDiffKB}_${maxBreakpoints}:json`
+		const breakpointTransformation: Record<string, any>[] = [...transformation, {
+			width: `auto:breakpoints_${_breakpointConfig.minWidth}_${_breakpointConfig.maxWidth}_${_breakpointConfig.minBreakpointSizeDiffKB}_${_breakpointConfig.maxBreakpoints}:json`
 		}];
 
-		const breakpointUrl = cloudinary.url(imageUrl, { ...this._baseConfig, transformation: breakpointTransformation });
+		const breakpointUrl: string = cloudinary.url(imageUrl, { ...this._baseConfig, transformation: breakpointTransformation });
 
 		try {
-			const response = await axios.get(breakpointUrl);
+			const response: any = await axios.get(breakpointUrl);
 
-			return response.data.breakpoints;
+			return response.data.breakpoints as number[];
 		} catch (error) {
 			const errorReason = error.response.headers['x-cld-error'];
 

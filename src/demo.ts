@@ -1,5 +1,5 @@
 // import path from 'path';
-import CloudinaryConnector from './src/CloudinaryConnector';
+import CloudinaryConnector from './CloudinaryConnector';
 
 /* eslint-disable no-console */
 async function demo() {

@@ -1,12 +1,12 @@
 {
     "name": "@swey/cloudinary-connector",
-    "version": "1.0.4",
+    "version": "2.0.1",
     "description": "",
     "main": "lib/CloudinaryConnector.js",
+    "types": "lib/CloudinaryConnector.d.ts",
     "scripts": {
-        "build": "rm -rf lib/* && babel src --out-dir lib",
-        "test": "echo \"Error: no test specified\" && exit 1",
-        "demo": "babel-node ./demo.js"
+        "build": "tsc",
+        "demo": "node ./lib/demo.js"
     },
     "author": "",
     "license": "ISC",
@@ -15,11 +15,7 @@
         "cloudinary": "1.11.0"
     },
     "devDependencies": {
-        "@babel/cli": "7.0.0",
-        "@babel/core": "7.0.0",
-        "@babel/node": "7.0.0",
-        "@babel/plugin-proposal-class-properties": "7.0.0-beta.49",
-        "@babel/plugin-proposal-object-rest-spread": "7.0.0",
-        "@babel/preset-env": "7.0.0"
+        "typescript": "3.4.3",
+        "@typescript-eslint/eslint-plugin": "^1.7.0"
     }
 }
