@@ -1,12 +1,12 @@
 import cloudinary from 'cloudinary';
 import axios from 'axios';
 
-interface BaseConfig {
+export interface BaseConfig {
 	type?: 'fetch' | 'upload',
 	secure?: boolean
 };
 
-interface BreakpointConfig {
+export interface BreakpointConfig {
 	minWidth: number,
 	maxWidth: number,
 	minBreakpointSizeDiffKB: number,
@@ -14,7 +14,7 @@ interface BreakpointConfig {
 	list?: any[]
 };
 
-interface Breakpoint {
+export interface Breakpoint {
 	src: string
 	width: number,
 	height?: number
