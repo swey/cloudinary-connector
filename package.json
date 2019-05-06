@@ -1,5 +1,5 @@
 {
-    "name": "@seibert-io/cloudinary-connector",
+    "name": "@swey/cloudinary-connector",
     "version": "2.0.0",
     "description": "",
     "main": "lib/CloudinaryConnector.js",
