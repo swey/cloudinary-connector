@@ -1,6 +1,6 @@
 {
     "name": "@swey/cloudinary-connector",
-    "version": "1.0.4",
+    "version": "2.0.0",
     "description": "",
     "main": "lib/CloudinaryConnector.js",
     "types": "lib/CloudinaryConnector.d.ts",
