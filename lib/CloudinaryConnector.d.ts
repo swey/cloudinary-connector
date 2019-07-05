@@ -1,7 +1,4 @@
-export interface BaseConfig {
-    type?: 'fetch' | 'upload';
-    secure?: boolean;
-}
+import { Transformation as CloudinaryTransformation } from 'cloudinary-core';
 export interface BreakpointConfig {
     minWidth: number;
     maxWidth: number;
@@ -14,25 +11,45 @@ export interface Breakpoint {
     width: number;
     height?: number;
 }
+export interface AssetInfoInput {
+    width: number;
+    height: number;
+    bytes: number;
+}
+export interface AssetInfoOutput extends AssetInfoInput {
+    format: string;
+}
+export interface AssetInfoResize {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    x_factor?: number;
+    y_factor?: number;
+}
+export interface AssetInfo {
+    input: AssetInfoInput;
+    resize?: AssetInfoResize[];
+    output: AssetInfoOutput;
+}
 export default class CloudinaryConnector {
-    private static BASE_CONFIG_DEFAULTS;
+    private static BASE_OPTIONS_DEFAULTS;
     private static BREAKPOINT_CONFIG_DEFAULTS;
     private static TRANSFORMATION_DEFAULTS;
     static MAX_PIXEL: number;
-    private _baseConfig;
+    private _baseOptions;
     private _breakpointConfig;
     private _transformationDefaults;
-    constructor(cloudName: string, baseConfig?: BaseConfig);
+    constructor(cloudName: string, baseConfig?: CloudinaryTransformation.Options);
     /**
      *
-     * @param {Object} config
+     * @param {Object} options
      */
-    updateBaseConfig(config: BaseConfig): void;
+    updateBaseOptions(options: CloudinaryTransformation.Options): void;
     /**
      *
-     * @returns {{type: string, secure: boolean, baseConfig}|*}
      */
-    getBaseConfig(): BaseConfig;
+    getBaseOptions(): CloudinaryTransformation.Options;
     /**
      *
      * @param {Object} config
@@ -40,21 +57,24 @@ export default class CloudinaryConnector {
     updateBreakpointConfig(config: BreakpointConfig): void;
     /**
      *
-     * @returns {{minBreakpointSizeDiffKB: number, maxBreakpoints: number, minWidth: number, maxWidth: number}|*}
      */
     getBreakpointConfig(): BreakpointConfig;
     /**
      *
      * @param {Object} defaults
      */
-    updateTransformationDefaults(defaults: Record<string, any>): void;
+    updateTransformationDefaults(defaults: CloudinaryTransformation.Options): void;
+    /**
+     *
+     */
+    getInfo(assetId: string, transformation?: CloudinaryTransformation | CloudinaryTransformation.Options): Promise<AssetInfo>;
     /**
      *
      * @param {String} imageUrl
      * @param {Object|Array} options
-     * @returns {Promise<{src: *, width: *, height: *}[]>}
      */
-    getSrcSet(imageUrl: string, options?: Record<string, any>): Promise<Breakpoint[]>;
+    getSrcSet(imageUrl: string, transformation?: CloudinaryTransformation | CloudinaryTransformation.Options, breakpointConfig?: BreakpointConfig): Promise<Breakpoint[]>;
+    private getTransformationChain;
     /**
      *
      * @param {String} imageUrl

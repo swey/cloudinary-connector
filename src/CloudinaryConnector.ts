@@ -1,10 +1,7 @@
 import cloudinary from 'cloudinary';
-import axios from 'axios';
+import { Transformation as CloudinaryTransformation } from 'cloudinary-core';
 
-export interface BaseConfig {
-	type?: 'fetch' | 'upload',
-	secure?: boolean
-};
+import axios from 'axios';
 
 export interface BreakpointConfig {
 	minWidth: number,
@@ -20,9 +17,33 @@ export interface Breakpoint {
 	height?: number
 }
 
+export interface AssetInfoInput {
+	width: number;
+	height: number;
+	bytes: number;
+}
+
+export interface AssetInfoOutput extends AssetInfoInput {
+	format: string
+}
+export interface AssetInfoResize {
+	x?: number;
+	y?: number;
+	width?: number;
+	height?: number;
+	x_factor?: number;
+	y_factor?: number;
+}
+
+export interface AssetInfo {
+	input: AssetInfoInput;
+	resize?: AssetInfoResize[]
+	output: AssetInfoOutput;
+}
+
 
 export default class CloudinaryConnector {
-	private static BASE_CONFIG_DEFAULTS: BaseConfig = {
+	private static BASE_OPTIONS_DEFAULTS: CloudinaryTransformation.Options = {
 		type: 'fetch',
 		secure: true
 	};
@@ -34,48 +55,47 @@ export default class CloudinaryConnector {
 		maxBreakpoints: 6
 	};
 
-	private static TRANSFORMATION_DEFAULTS: Record<string, any> = {
+	private static TRANSFORMATION_DEFAULTS: CloudinaryTransformation.Options = {
 		crop: 'fill',
 		fetch_format: 'auto'
 	};
 
 	static MAX_PIXEL = 25 * 1000 * 1000;
 
-	private _baseConfig: BaseConfig;
+	private _baseOptions: CloudinaryTransformation.Options;
 
 	private _breakpointConfig: BreakpointConfig;
 
-	private _transformationDefaults: Record<string, any>;
+	private _transformationDefaults: CloudinaryTransformation.Options;
 
-	constructor(cloudName: string, baseConfig: BaseConfig = {}) {
+	constructor(cloudName: string, baseConfig?: CloudinaryTransformation.Options) {
 		cloudinary.config({
 			cloud_name: cloudName
 		});
 
 		// Make sure the default objects for the settings/defaults cannot be overwritten
-		Object.freeze(CloudinaryConnector.BASE_CONFIG_DEFAULTS);
+		Object.freeze(CloudinaryConnector.BASE_OPTIONS_DEFAULTS);
 		Object.freeze(CloudinaryConnector.BREAKPOINT_CONFIG_DEFAULTS);
 		Object.freeze(CloudinaryConnector.TRANSFORMATION_DEFAULTS);
 
-		this._baseConfig = { ...CloudinaryConnector.BASE_CONFIG_DEFAULTS, ...baseConfig };
+		this._baseOptions = { ...CloudinaryConnector.BASE_OPTIONS_DEFAULTS, ...baseConfig };
 		this._breakpointConfig = { ...CloudinaryConnector.BREAKPOINT_CONFIG_DEFAULTS };
 		this._transformationDefaults = { ...CloudinaryConnector.TRANSFORMATION_DEFAULTS };
 	}
 
 	/**
 	 *
-	 * @param {Object} config
+	 * @param {Object} options
 	 */
-	public updateBaseConfig(config: BaseConfig): void {
-		this._baseConfig = { ...this._baseConfig, ...config };
+	public updateBaseOptions(options: CloudinaryTransformation.Options): void {
+		this._baseOptions = { ...this._baseOptions, ...options };
 	}
 
 	/**
 	 *
-	 * @returns {{type: string, secure: boolean, baseConfig}|*}
 	 */
-	public getBaseConfig(): BaseConfig {
-		return this._baseConfig;
+	public getBaseOptions(): CloudinaryTransformation.Options {
+		return this._baseOptions;
 	}
 
 	/**
@@ -88,7 +108,6 @@ export default class CloudinaryConnector {
 
 	/**
 	 *
-	 * @returns {{minBreakpointSizeDiffKB: number, maxBreakpoints: number, minWidth: number, maxWidth: number}|*}
 	 */
 	public getBreakpointConfig(): BreakpointConfig {
 		return this._breakpointConfig;
@@ -98,57 +117,91 @@ export default class CloudinaryConnector {
 	 *
 	 * @param {Object} defaults
 	 */
-	public updateTransformationDefaults(defaults: Record<string, any>): void {
+	public updateTransformationDefaults(defaults: CloudinaryTransformation.Options): void {
 		this._transformationDefaults = { ...this._transformationDefaults, ...defaults };
+	}
+
+
+	/**
+	 *
+	 */
+	public async getInfo(assetId: string, transformation?: CloudinaryTransformation | CloudinaryTransformation.Options): Promise<AssetInfo> {
+
+		let transformationChain: CloudinaryTransformation = this.getTransformationChain(transformation);
+
+		transformationChain = transformationChain.chain();
+		transformationChain.flags('getinfo');
+
+
+		const cloudinaryUrl: string = cloudinary.url(assetId, { ...transformationChain.toOptions(), secure: true });
+
+		try {
+			const response: any = await axios.get(cloudinaryUrl);
+
+			return response.data as AssetInfo;
+		} catch (error) {
+			console.log(error)
+			const errorReason = error.response && error.response.headers ? error.response.headers['x-cld-error'] : error.message;
+
+			throw new Error(`[CloudinaryConnector] Error getting info for ${assetId}\n${cloudinaryUrl}\n${errorReason}`);
+		}
 	}
 
 	/**
 	 *
 	 * @param {String} imageUrl
 	 * @param {Object|Array} options
-	 * @returns {Promise<{src: *, width: *, height: *}[]>}
 	 */
-	public async getSrcSet(imageUrl: string, options: Record<string, any> = {}): Promise<Breakpoint[]> {
-		let transformation = options.transformation || options;
+	public async getSrcSet(imageUrl: string, transformation?: CloudinaryTransformation | CloudinaryTransformation.Options, breakpointConfig?: BreakpointConfig): Promise<Breakpoint[]> {
+		const transformationChain: CloudinaryTransformation = this.getTransformationChain(transformation)
 
-		if (!Array.isArray(transformation)) {
-			transformation = [transformation];
-		}
-
-		// Append transformation defaults for the first transformation
-		transformation[0] = { ...this._transformationDefaults, ...transformation[0] };
+		/*
+		// Can't see if and how the following was still being used
 
 		// Aspect Ratio Handling
 		transformation.map((transformationItem: Record<string, any>): Record<string, any> => {
-			/* eslint-disable no-param-reassign */
+			// eslint-disable no-param-reassign
 			if (transformationItem.aspectRatio) {
 				transformationItem.aspect_ratio = transformationItem.aspectRatio.replace(/x/, ':');
 				delete transformationItem.aspectRatio;
 			}
-			/* eslint-enable no-param-reassign */
+			// eslint-enable no-param-reassign
 
 			return transformationItem;
 		});
 
+		*/
+
 		let breakpoints: number[];
 
 		try {
-			breakpoints = await this.getBreakpoints(imageUrl, transformation, options.breakpointConfig);
+			breakpoints = await this.getBreakpoints(imageUrl, transformationChain, breakpointConfig);
 		} catch (error) {
 			// Catch the error and continue without calculated breakpoints
 			console.error(error.message);
-			const breakpointConfig: BreakpointConfig = { ...this._breakpointConfig, ...options.breakpointConfig };
-			breakpoints = [breakpointConfig.minWidth, breakpointConfig.minWidth / 2 + breakpointConfig.maxWidth / 2, breakpointConfig.maxWidth];
+			const joinedBreakpointConfig: BreakpointConfig = { ...this._breakpointConfig, ...breakpointConfig };
+			breakpoints = [joinedBreakpointConfig.minWidth, joinedBreakpointConfig.minWidth / 2 + joinedBreakpointConfig.maxWidth / 2, joinedBreakpointConfig.maxWidth];
 		}
 
 		return breakpoints.map((breakpoint: number): Breakpoint => {
-			transformation[0].width = breakpoint;
-
 			return {
-				src: cloudinary.url(imageUrl, { ...this._baseConfig, transformation }),
+				src: cloudinary.url(imageUrl, { ...transformationChain.toOptions(), width: breakpoint, secure: true }),
 				width: breakpoint,
 			};
 		});
+	}
+
+	private getTransformationChain(transformation?: CloudinaryTransformation | CloudinaryTransformation.Options): CloudinaryTransformation {
+		let transformationChain: CloudinaryTransformation = CloudinaryTransformation.new({ ...this._baseOptions, ...this._transformationDefaults});
+
+		// apply custom transformation
+		if (transformation) {
+			transformationChain = CloudinaryTransformation.new({...transformationChain, ...((transformation.toOptions !== undefined)
+				? transformation.toOptions()
+				: transformation)});
+
+		}
+		return transformationChain;
 	}
 
 
@@ -159,7 +212,7 @@ export default class CloudinaryConnector {
 	 * @param {Object} [breakpointConfig]
 	 * @returns {Promise<Array>}
 	 */
-	private async getBreakpoints(imageUrl: string, transformation: any[], breakpointConfig?: BreakpointConfig): Promise<number[]> {
+	private async getBreakpoints(imageUrl: string, transformation: CloudinaryTransformation, breakpointConfig?: BreakpointConfig): Promise<number[]> {
 		const _breakpointConfig: BreakpointConfig = { ...this._breakpointConfig, ...breakpointConfig };
 
 		// If a "list" is given in the breakpoint config, use that list instead of calculating one.
@@ -172,15 +225,14 @@ export default class CloudinaryConnector {
 			return [_breakpointConfig.maxWidth];
 		}
 
-		const breakpointTransformation: Record<string, any>[] = [...transformation, {
-			width: `auto:breakpoints_${_breakpointConfig.minWidth}_${_breakpointConfig.maxWidth}_${_breakpointConfig.minBreakpointSizeDiffKB}_${_breakpointConfig.maxBreakpoints}:json`
-		}];
 
-		const breakpointUrl: string = cloudinary.url(imageUrl, { ...this._baseConfig, transformation: breakpointTransformation });
+		const transformationChain: CloudinaryTransformation  = new CloudinaryTransformation(transformation.toOptions());
+		transformationChain.width(`auto:breakpoints_${_breakpointConfig.minWidth}_${_breakpointConfig.maxWidth}_${_breakpointConfig.minBreakpointSizeDiffKB}_${_breakpointConfig.maxBreakpoints}:json`);
+
+		const breakpointUrl: string = cloudinary.url(imageUrl, { ...transformationChain.toOptions(), secure: true });
 
 		try {
 			const response: any = await axios.get(breakpointUrl);
-
 			return response.data.breakpoints as number[];
 		} catch (error) {
 			const errorReason = error.response.headers['x-cld-error'];
